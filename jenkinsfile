@@ -1,0 +1,33 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Download Docker file from github to jenkins') {
+            steps {
+                git branch: 'main', url: 'https://github.com/princenarula00/grovyscript.git'
+            }
+        }
+        stage('Copy Docker file jenkins to ansible') {
+            steps {
+                sshPublisher(publishers: [sshPublisherDesc(configName: 'jenkins', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: 'rsync -e ssh /var/lib/jenkins/workspace/grovypipeline/dockerfile root@172.31.9.122:/project', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '', remoteDirectorySDF: false, removePrefix: '', sourceFiles: '')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: false)])
+            }
+        }
+        stage('Build docker file on ansible machine') {
+            steps {
+                sshPublisher(publishers: [sshPublisherDesc(configName: 'ansible', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: '''cd /project
+docker build -t $JOB_NAME:v$BUILD_ID .
+docker tag $JOB_NAME:v$BUILD_ID princenarula00/$JOB_NAME:v$BUILD_ID
+docker tag $JOB_NAME:v$BUILD_ID princenarula00/$JOB_NAME:latest
+docker push princenarula00/$JOB_NAME:v$BUILD_ID
+docker push princenarula00/$JOB_NAME:latest
+docker rmi -f princenarula00/$JOB_NAME:latest princenarula00/$JOB_NAME:v$BUILD_ID $JOB_NAME:v$BUILD_ID''', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '', remoteDirectorySDF: false, removePrefix: '', sourceFiles: '')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: false)])
+            }
+        }
+        stage('Launch container from ansible to docker host') {
+            steps {
+                sshPublisher(publishers: [sshPublisherDesc(configName: 'ansible', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: '''cd ansible
+ansible-playbook project.yml''', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '', remoteDirectorySDF: false, removePrefix: '', sourceFiles: '')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: false)])
+            }
+        }
+    }
+}
